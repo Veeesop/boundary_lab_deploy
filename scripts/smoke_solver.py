@@ -13,7 +13,7 @@ from boundary_deploy.worker import _worker
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--backend', choices=['cpu', 'cuda'], default='cuda')
+    parser.add_argument('--backend', choices=['cpu', 'cuda', 'metal'], default='cuda')
     parser.add_argument('--output', type=Path, default=Path('runs/standalone-mixed-smoke'))
     parser.add_argument("--library", type=Path)
     args = parser.parse_args()

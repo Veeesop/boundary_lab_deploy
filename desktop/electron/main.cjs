@@ -21,9 +21,13 @@ const deployWorker = new DeployWorkerClient(() => resolveRuntime({
 }));
 
 const solverPreferences = new SolverPreferences(join(app.getPath("userData"), "solver-preferences.json"),
-  async () => (await deployWorker.solve({}, null, "backend", "detect_backend")).backend);
+  async (backend) => (await deployWorker.solve({ backend }, null, "backend", "detect_backend")).backend);
 ipcMain.handle("deploy:get-solver-backend", () => solverPreferences.get());
 ipcMain.handle("deploy:set-solver-backend", (_event, backend) => solverPreferences.set(backend));
+ipcMain.handle("deploy:detect-solver-backend", async (_event, backend) => {
+  const result = await deployWorker.solve({ backend }, null, "backend", "detect_backend");
+  return result.backend === backend;
+});
 
 function createWindow() {
   const level2Smoke = process.argv.includes("--smoke-level2");
@@ -673,6 +677,8 @@ function createWindow() {
         sourceCount: document.querySelectorAll('.scene-tree .tree-button').length,
         activeFidelity: document.querySelector('.fidelity-switcher button.active span')?.textContent,
         boundaryButtonTitle: document.querySelectorAll('.fidelity-switcher button')[1]?.title,
+        boundaryBackendLabel: document.querySelectorAll('.fidelity-switcher button')[1]?.querySelector('small')?.textContent,
+        coupledButtonTitle: document.querySelectorAll('.fidelity-switcher button')[2]?.title,
         solveButtonEnabled: !document.querySelector('.primary-button')?.disabled,
         solveButtonLabel: document.querySelector('.primary-button')?.textContent?.trim(),
         openProjectAvailable: Boolean(document.querySelector('button[aria-label="Open project"]')),
@@ -682,6 +688,19 @@ function createWindow() {
       })`);
       console.log(JSON.stringify({ ...snapshot, openProjectInteraction, packageImportInteraction, rigidMeshInteraction, transformInteraction, planeResolutionInteraction, sceneObjectInteraction, traceFilterInteraction, chartResizeInteraction, emptySourceInteraction, paneLayoutInteraction, level2Move, consoleErrors }));
       if (openProjectInteraction?.error || consoleErrors.length) {
+        app.exit(1);
+        return;
+      }
+      if (process.platform === "darwin" && (
+        snapshot.boundaryBackendLabel !== "Metal" ||
+        !snapshot.coupledButtonTitle?.includes("currently requires CUDA")
+      )) {
+        console.error("macOS Deploy must select Metal for Level 2 and explain that Level 3 requires CUDA.");
+        app.exit(1);
+        return;
+      }
+      if (level2Smoke && (!level2Move?.moved || level2Move.error)) {
+        console.error("Deploy Level 2 desktop solve or follow-up edit solve did not complete.");
         app.exit(1);
         return;
       }

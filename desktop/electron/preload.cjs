@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("boundaryLabDesktop", {
   getSolverBackend: () => ipcRenderer.invoke("deploy:get-solver-backend"),
   setSolverBackend: (backend) => ipcRenderer.invoke("deploy:set-solver-backend", backend),
+  detectSolverBackend: (backend) => ipcRenderer.invoke("deploy:detect-solver-backend", backend),
   readSceneClipboard: () => ipcRenderer.invoke("deploy:read-scene-clipboard"),
   writeSceneClipboard: (text) => ipcRenderer.invoke("deploy:write-scene-clipboard", text),
   loadBundledExample: () => ipcRenderer.invoke("deploy:load-bundled-example"),
