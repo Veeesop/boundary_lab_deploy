@@ -118,7 +118,6 @@ def test_prepare_deploy_solve_request_stages_lod_trace_and_grid(tmp_path: Path) 
         "reflection_coefficient": 1.0,
     }
     assert request["provenance"]["exterior_domain"] == "rigid_y0_half_space"
-
     with zipfile.ZipFile(PACKAGE_PATH, "r") as archive:
         source_convention = json.loads(archive.read("manifest.json")).get("phasor_convention", LEGACY_PHASOR_CONVENTION)
         with np.load(io.BytesIO(archive.read("data/fixed-sources.npz")), allow_pickle=False) as fixed:
@@ -139,6 +138,26 @@ def test_prepare_deploy_solve_request_stages_lod_trace_and_grid(tmp_path: Path) 
         "excitation:component-18ds115-4",
         "excitation:component-18ds115-4__reflect_x",
     ]
+
+
+def test_prepare_deploy_metal_request_uses_metal_backend_and_host_observation_points(tmp_path: Path) -> None:
+    payload = _payload() | {"backend": "metal"}
+
+    _, request = prepare_deploy_solve_request(payload, tmp_path)
+
+    assert request["beat_engine_backend"] == "metal"
+    assert request["burton_miller_assembly"] == "operator_matrices"
+    assert len(request["observation_points_m"]) == 35
+    assert request["observation_shape"] == [5, 7]
+    assert request["observation_sample_indices"] == list(range(35))
+    assert "observation_plane" not in request
+
+
+def test_prepare_deploy_rejects_metal_for_level_three_rom(tmp_path: Path) -> None:
+    payload = _payload() | {"backend": "metal", "fidelity": "coupled"}
+
+    with pytest.raises(ValueError, match="Level 3.*CUDA"):
+        prepare_deploy_solve_request(payload, tmp_path)
 
 
 def test_prepare_deploy_solve_request_mutes_source_drive(tmp_path: Path) -> None:
@@ -539,6 +558,18 @@ def test_prepare_deploy_field_request_contains_only_observation_data(tmp_path: P
 def test_prepare_deploy_cpu_field_request_keeps_explicit_points(tmp_path: Path) -> None:
     payload = _payload()
     payload.update({"solutionKey": "cpu-boundary", "backend": "cpu"})
+
+    _, request = prepare_deploy_field_request(payload, tmp_path)
+
+    assert len(request["observation_points_m"]) == 35
+    assert request["observation_shape"] == [5, 7]
+    assert request["observation_sample_indices"] == list(range(35))
+    assert "observation_plane" not in request
+
+
+def test_prepare_deploy_metal_field_request_keeps_explicit_points(tmp_path: Path) -> None:
+    payload = _payload()
+    payload.update({"solutionKey": "metal-boundary", "backend": "metal"})
 
     _, request = prepare_deploy_field_request(payload, tmp_path)
 
