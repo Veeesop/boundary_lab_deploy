@@ -39,6 +39,18 @@ def test_rejects_unpinned_engine(release, dependency):
         functions["check"]("v1.2.3")
 
 
+@pytest.mark.parametrize("owner", ["JWSound", "Veeesop"])
+def test_accepts_release_pinned_beat_wheel_from_supported_fork(release, owner):
+    root, functions = release
+    dependency = (
+        f"beat-engine @ https://github.com/{owner}/BEAT_Engine/releases/download/"
+        "v0.4.0rc1/beat_engine-0.4.0rc1-py3-none-any.whl#sha256=" + "a" * 64
+    )
+    with (root / "pyproject.toml").open("a") as output:
+        output.write("dependencies = [" + json.dumps(dependency) + "]\n")
+    functions["check"]("v1.2.3")
+
+
 def test_checksums_cover_exact_artifact_bytes(release):
     root, functions = release
     dist = root / "dist"

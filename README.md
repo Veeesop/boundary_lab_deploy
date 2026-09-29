@@ -39,9 +39,16 @@ this repository:
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
-python -m pip install --no-deps -e ../BEAT_Engine
 python -m beat_engine instantiate --backend metal
 python -m beat_engine doctor --backend metal --threads 2
+```
+
+The normal setup installs the exact released BEAT wheel pinned in
+`pyproject.toml`. For cross-repository BEAT development only, replace that
+installed dependency explicitly with a companion checkout:
+
+```bash
+python -m pip install --no-deps -e ../BEAT_Engine
 ```
 
 Install the desktop dependencies and start Deploy from the checkout:
@@ -116,13 +123,12 @@ No `PYTHONPATH` injection or Boundary Lab checkout is required.
 
 The BEAT dependency is pinned to a published wheel and SHA-256 in `pyproject.toml`.
 The bundled runtime uses the same pin in `packaging/runtime-lock.json`. The
-released BEAT 0.3.0 wheel includes the mixed-package schema 3 support required
-for Coupled solves. The Metal Level 2 work described above is still source-candidate
-work and does not change this released wheel pin.
+published BEAT 0.4.0rc1 wheel includes the Deploy Level 2 Metal path and is
+qualified on Apple Silicon. The candidate scope and limits are recorded in its
+release notes; Deploy Level 3 remains CUDA-only.
 
-Development against a candidate engine must be explicit and use a unique version
-in a separate virtual environment. Such results do not certify the released pin.
-Restore the declared dependency before validating a release build.
+Development against an unpublished engine checkout must be explicit and use a
+separate virtual environment. Such results do not certify the declared wheel pin.
 
 ## Verification
 
