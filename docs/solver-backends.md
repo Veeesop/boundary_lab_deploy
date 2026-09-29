@@ -14,9 +14,9 @@ The CPU coupled path uses the exported parity Petrov-Galerkin speaker ROM, the C
 
 ## Development and release dependency
 
-This feature requires BEAT Engine 0.3.0 for CPU Coupled solving. BEAT 0.2.0 supports CPU Boundary solving but rejects CPU parity-ROM solves. The development environment can use an editable checkout of the companion engine.
+The released dependency is BEAT Engine 0.4.0rc1, pinned by immutable wheel URL and SHA-256 in both `pyproject.toml` and `packaging/runtime-lock.json`. It supplies the Deploy fixed-source Level 2 Metal path and retains the CPU Coupled support introduced in 0.3.0. The normal source setup uses the pinned wheel; an editable companion checkout is reserved for explicit cross-repository development.
 
-Before releasing this Deploy feature, publish and qualify a new BEAT wheel, then update **both** `pyproject.toml` and `packaging/runtime-lock.json` with its immutable URL and SHA-256. Do not repoint the existing 0.2.0 release. Boundary Lab's independent engine pin does not need to change.
+Deploy's BEAT pin must remain identical in `pyproject.toml` and `packaging/runtime-lock.json`. Boundary Lab's independent engine pin does not need to change.
 
 ## Qualification
 

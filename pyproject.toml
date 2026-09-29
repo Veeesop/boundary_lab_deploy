@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
 dependencies = [
-  "beat-engine @ https://github.com/JWSound/BEAT_Engine/releases/download/v0.3.0/beat_engine-0.3.0-py3-none-any.whl#sha256=b1476287d893a208d14f6c5ef2292e7a831c78d903d72357a5a29a291016fdae",
+  "beat-engine @ https://github.com/Veeesop/BEAT_Engine/releases/download/v0.4.0rc1/beat_engine-0.4.0rc1-py3-none-any.whl#sha256=8bba352f925a709fe9aa8546c50dc1f173cf6f2b5b9ea479300cf0c9fb25b267",
   "numpy", "meshio",
 ]
 
@@ -25,6 +25,13 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/boundary_deploy"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.venv",
+  "/.venv-*",
+  "/.idea",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

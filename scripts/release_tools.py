@@ -24,7 +24,7 @@ def check(tag):
     dependencies = project.get("dependencies", [])
     beat = next((d for d in dependencies if d.startswith("beat-engine")), None)
     if beat and not re.fullmatch(
-        r"beat-engine @ https://github.com/JWSound/BEAT_Engine/releases/download/v\d+\.\d+\.\d+(?:rc\d+)?/beat_engine-[^/]+\.whl#sha256=[0-9a-f]{64}",
+        r"beat-engine @ https://github.com/(?:JWSound|Veeesop)/BEAT_Engine/releases/download/v\d+\.\d+\.\d+(?:rc\d+)?/beat_engine-[^/]+\.whl#sha256=[0-9a-f]{64}",
         beat,
     ):
         raise ValueError("Releases require a published BEAT wheel with a SHA-256 pin.")
