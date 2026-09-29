@@ -27,7 +27,7 @@ interface DesktopLevel2SolveRequest {
   packagePath: string;
   packagePaths?: Record<string, string>;
   frequencyHz: number;
-  backend: "cuda" | "cpu";
+  backend: "cuda" | "cpu" | "metal";
   fidelity?: "boundary" | "coupled";
   sources: import("./model/types").SourceConfiguration[];
   rigidObjects: DesktopRigidObject[];
@@ -47,7 +47,7 @@ interface DesktopSolveStatus {
 interface DesktopMicrophoneSweepRequest {
   packagePath: string;
   packagePaths?: Record<string, string>;
-  backend: "cuda" | "cpu";
+  backend: "cuda" | "cpu" | "metal";
   fidelity: "boundary" | "coupled";
   sources: import("./model/types").SourceConfiguration[];
   rigidObjects: DesktopRigidObject[];
@@ -74,8 +74,9 @@ interface DesktopMicrophoneSweepProgress {
 interface Window {
   boundaryLabDeployProfile?: Record<string, unknown>;
   boundaryLabDesktop?: {
-    getSolverBackend: () => Promise<"cpu" | "cuda">;
-    setSolverBackend: (backend: "cpu" | "cuda") => Promise<"cpu" | "cuda">;
+    getSolverBackend: () => Promise<"cpu" | "cuda" | "metal">;
+    setSolverBackend: (backend: "cpu" | "cuda" | "metal") => Promise<"cpu" | "cuda" | "metal">;
+    detectSolverBackend: (backend: "cuda" | "metal") => Promise<boolean>;
     readSceneClipboard: () => Promise<string>;
     writeSceneClipboard: (text: string) => Promise<void>;
     loadBundledExample: () => Promise<DesktopPackageSelection | null>;

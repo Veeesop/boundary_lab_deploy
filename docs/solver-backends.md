@@ -1,8 +1,14 @@
 # Solver backends
 
-Preferences (the top-right settings button) selects CPU or NVIDIA CUDA for Boundary and Coupled solves, microphone sweeps, and audience-plane updates. The choice is saved in `solver-preferences.json` under Electron's user-data directory, independently of projects.
+Preferences (the top-right settings button) selects CPU, NVIDIA CUDA, or Apple Metal for Boundary and Coupled solves, microphone sweeps, and audience-plane updates. Metal is available as an option on macOS; CUDA remains visible there for users with a separately configured CUDA-capable worker/runtime. The choice is saved in `solver-preferences.json` under Electron's user-data directory, independently of projects.
 
-On first launch, Deploy probes the CUDA engine's versioned worker handshake. It selects CUDA only when the worker reports that CUDA is available; otherwise it selects CPU. Later launches retain the saved choice. Selecting a backend is disabled during a running solve or sweep. Switching backends invalidates the desktop result identity and uses the corresponding engine worker.
+On first launch, Deploy probes Metal on macOS and CUDA on Windows/Linux through the versioned BEAT worker handshake. It selects the requested accelerator only when that backend reports available; otherwise it selects CPU. Later launches retain the saved choice exactly. Selecting a backend is disabled during a running solve or sweep. Switching backends invalidates the desktop result identity and uses the corresponding engine worker. An unavailable selected backend reports an error and does not silently switch to another backend. Use **Check Metal** or **Check CUDA** in Preferences to probe either accelerator explicitly; a failed probe does not change the selected backend.
+
+The BEAT CUDA catalog currently targets Windows and Linux, while its Metal
+catalog targets macOS. Therefore a native macOS CUDA selection requires a
+separately configured environment that can actually provide the CUDA worker;
+the UI preserves the selection and reports worker unavailability rather than
+substituting Metal or CPU.
 
 The CPU coupled path uses the exported parity Petrov-Galerkin speaker ROM, the CPU exterior Burton-Miller operators, one exterior LU factorization per frequency, and a host-array GMRES feedback solve. It preserves the same ROM response, phasor convention, field reuse, and sweep warm-start contracts as CUDA.
 

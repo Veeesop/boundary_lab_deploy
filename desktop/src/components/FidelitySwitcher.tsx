@@ -2,22 +2,22 @@ import type { Fidelity } from "../model/types";
 
 export function FidelitySwitcher({
   value,
-  backend,
   onChange,
   packageLevel,
   boundaryAvailable,
   boundaryUnavailableReason,
   coupledAvailable,
   coupledUnavailableReason,
+  solverLabel,
 }: {
   value: Fidelity;
-  backend?: "cpu" | "cuda" | null;
   onChange: (value: Fidelity) => void;
   packageLevel: number;
   boundaryAvailable: boolean;
   boundaryUnavailableReason?: string;
   coupledAvailable: boolean;
   coupledUnavailableReason?: string;
+  solverLabel: string;
 }) {
   const levels: Array<{ id: Fidelity; label: string; level: number }> = [
     { id: "pattern", label: "Pattern", level: 1 },
@@ -49,7 +49,7 @@ export function FidelitySwitcher({
                 : available ? "This fidelity is not connected yet" : "Package does not contain this fidelity"}
           >
             <span>{item.label}</span>
-            {item.id !== "pattern" && interactive && <small>{backend?.toUpperCase() ?? "..."}</small>}
+            {item.id !== "pattern" && interactive && <small>{solverLabel}</small>}
             {!interactive && item.id !== "pattern" && <small>{available ? "ENGINE" : "N/A"}</small>}
           </button>
         );

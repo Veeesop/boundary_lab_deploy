@@ -128,6 +128,48 @@ def test_level_three_execution_rejects_exact_and_routes_rom_packages() -> None:
     assert deploy_worker._execution_worker_key(payload, _CoupledPackageCache("parity_petrov_galerkin_rom")) == "cuda"
 
 
+def test_level_three_metal_execution_is_rejected_before_rom_loading() -> None:
+    payload = {"packagePath": "speaker.blabsp", "backend": "metal", "fidelity": "coupled"}
+
+    with pytest.raises(ValueError, match="Level 3.*CUDA"):
+        deploy_worker._execution_worker_key(payload, _CoupledPackageCache("parity_petrov_galerkin_rom"))
+
+
+def test_worker_selects_metal_julia_project(monkeypatch) -> None:
+    monkeypatch.setattr(deploy_worker.sys, "platform", "darwin")
+    captured = {}
+
+    class Worker:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(deploy_worker, "BeatEngineWorkerProcess", Worker)
+
+    deploy_worker._worker("metal")
+
+    assert captured["julia_project"] == deploy_worker.DEFAULT_BEAT_ENGINE_METAL_PROJECT
+
+
+def test_worker_keeps_cuda_julia_project_selection(monkeypatch) -> None:
+    captured = {}
+
+    class Worker:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(deploy_worker, "BeatEngineWorkerProcess", Worker)
+
+    deploy_worker._worker("cuda")
+
+    assert captured["julia_project"] == deploy_worker.DEFAULT_BEAT_ENGINE_CUDA_PROJECT
+
+
+def test_worker_rejects_metal_warmup_off_macos(monkeypatch) -> None:
+    monkeypatch.setattr(deploy_worker.sys, "platform", "linux")
+    with pytest.raises(ValueError, match="only on macOS"):
+        deploy_worker._worker("metal")
+
+
 def test_transducer_velocity_result_flattens_scene_instances() -> None:
     request = {
         "transducers": [
@@ -376,19 +418,35 @@ def test_completion_follows_cleanup_and_accepts_immediate_next_job(monkeypatch):
     assert not any(event["type"] == "failed" for event in events)
 
 
-@pytest.mark.parametrize("available, expected", [(True, "cuda"), (False, "cpu"), (None, "cpu")])
-def test_detect_backend_uses_engine_availability(monkeypatch, available, expected):
+@pytest.mark.parametrize(
+    "platform, backend, available, expected",
+    [
+        ("win32", "cuda", True, "cuda"),
+        ("win32", "cuda", False, "cpu"),
+        ("darwin", "metal", True, "metal"),
+        ("darwin", "metal", False, "cpu"),
+        ("darwin", "cuda", True, "cuda"),
+        ("darwin", "cuda", False, "cpu"),
+    ],
+)
+def test_detect_backend_uses_requested_engine_availability(monkeypatch, platform, backend, available, expected):
     calls = []
+
     class Probe:
-        worker_info = {"backends": {"cuda": {"available": available}}}
         def __init__(self, **kwargs):
             assert kwargs["solver_script"].name == "coupled_solver.jl"
+            assert kwargs["julia_project"] == getattr(deploy_worker, f"DEFAULT_BEAT_ENGINE_{backend.upper()}_PROJECT")
+            self.worker_info = {"backends": {backend: {"available": available}}}
+
         def ensure_started(self):
             calls.append("start")
+
         def terminate(self):
             calls.append("stop")
+
     monkeypatch.setattr(deploy_worker, "BeatEngineWorkerProcess", Probe)
-    assert deploy_worker.detect_solver_backend() == expected
+    monkeypatch.setattr(deploy_worker.sys, "platform", platform)
+    assert deploy_worker.detect_solver_backend(backend) == expected
     assert calls == ["start", "stop"]
 
 
@@ -404,3 +462,9 @@ def test_detect_backend_falls_back_and_cleans_up_on_failure(monkeypatch):
     monkeypatch.setattr(deploy_worker, "BeatEngineWorkerProcess", Probe)
     assert deploy_worker.detect_solver_backend() == "cpu"
     assert stopped == [True]
+
+
+@pytest.mark.parametrize("backend", ["cpu", "rocm", "unknown"])
+def test_detect_backend_rejects_non_accelerator_backend(backend):
+    with pytest.raises(ValueError, match="CUDA or Metal"):
+        deploy_worker.detect_solver_backend(backend)

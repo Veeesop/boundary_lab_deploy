@@ -20,6 +20,7 @@ from boundary_deploy.assets import DeploySolveCache
 from boundary_deploy.engine_runtime import (
     DEFAULT_BEAT_ENGINE_CPU_PROJECT,
     DEFAULT_BEAT_ENGINE_CUDA_PROJECT,
+    DEFAULT_BEAT_ENGINE_METAL_PROJECT,
     DEFAULT_BEAT_ENGINE_SOLVER_SCRIPT,
     BeatEngineWorkerProcess,
 )
@@ -59,9 +60,15 @@ def _emit(event_type: str, *, request_id: object | None = None, **values: Any) -
 
 def _worker(backend: str) -> BeatEngineWorkerProcess:
     normalized = backend.strip().lower()
-    if normalized not in {"cuda", "cpu"}:
-        raise ValueError("Deploy worker backend must be cuda or cpu.")
-    project = DEFAULT_BEAT_ENGINE_CUDA_PROJECT if normalized == "cuda" else DEFAULT_BEAT_ENGINE_CPU_PROJECT
+    if normalized not in {"cuda", "cpu", "metal"}:
+        raise ValueError("Deploy worker backend must be cuda, cpu, or metal.")
+    if normalized == "metal" and sys.platform != "darwin":
+        raise ValueError("BEAT Metal solving is available only on macOS.")
+    project = {
+        "cuda": DEFAULT_BEAT_ENGINE_CUDA_PROJECT,
+        "cpu": DEFAULT_BEAT_ENGINE_CPU_PROJECT,
+        "metal": DEFAULT_BEAT_ENGINE_METAL_PROJECT,
+    }[normalized]
     return BeatEngineWorkerProcess(
         julia_executable=os.environ.get("DEPLOY_JULIA_EXE", os.environ.get("BLAB_JULIA_EXE", "julia")),
         solver_script=DEFAULT_BEAT_ENGINE_SOLVER_SCRIPT,
@@ -70,20 +77,23 @@ def _worker(backend: str) -> BeatEngineWorkerProcess:
     )
 
 
-def detect_solver_backend() -> str:
-    """Probe the engine's CUDA handshake, not just the presence of a GPU driver."""
+def detect_solver_backend(backend: str | None = None) -> str:
+    """Probe one explicitly requested accelerator through the worker handshake."""
+    preferred = (backend or ("metal" if sys.platform == "darwin" else "cuda")).strip().lower()
+    if preferred not in {"cuda", "metal"}:
+        raise ValueError("Backend detection supports CUDA or Metal.")
     probe = BeatEngineWorkerProcess(
         julia_executable=os.environ.get("DEPLOY_JULIA_EXE", os.environ.get("BLAB_JULIA_EXE", "julia")),
-        solver_script=engine_paths("cuda").system_solver,
+        solver_script=engine_paths(preferred).system_solver,
         julia_threads="2",
-        julia_project=DEFAULT_BEAT_ENGINE_CUDA_PROJECT,
+        julia_project={"cuda": DEFAULT_BEAT_ENGINE_CUDA_PROJECT, "metal": DEFAULT_BEAT_ENGINE_METAL_PROJECT}[preferred],
     )
     try:
         probe.ensure_started()
         info = probe.worker_info or {}
-        return "cuda" if info.get("backends", {}).get("cuda", {}).get("available") is True else "cpu"
+        return preferred if info.get("backends", {}).get(preferred, {}).get("available") is True else "cpu"
     except Exception as exc:
-        print(f"CUDA availability check failed; using CPU: {exc}", file=sys.stderr)
+        print(f"{preferred.upper()} availability check failed; using CPU: {exc}", file=sys.stderr)
         return "cpu"
     finally:
         probe.terminate()
@@ -92,6 +102,8 @@ def detect_solver_backend() -> str:
 def _worker_key(payload: object) -> str:
     backend = str(payload.get("backend", "cuda")) if isinstance(payload, dict) else "cuda"
     normalized = backend.strip().lower()
+    if normalized not in {"cuda", "cpu", "metal"}:
+        raise ValueError("Deploy worker backend must be cuda, cpu, or metal.")
     return normalized
 
 
@@ -99,7 +111,12 @@ def _execution_worker_key(payload: object, solve_cache: DeploySolveCache) -> str
     """Resolve Level 3 ROM jobs onto the exterior worker that executes them."""
 
     worker_key = _worker_key(payload)
-    if not isinstance(payload, dict) or str(payload.get("fidelity", "boundary")).strip().lower() != "coupled":
+    if not isinstance(payload, dict):
+        return worker_key
+    fidelity = str(payload.get("fidelity", "boundary")).strip().lower()
+    if fidelity == "coupled" and worker_key == "metal":
+        raise ValueError("Deploy Level 3 parity ROM currently requires the CUDA backend.")
+    if fidelity != "coupled":
         return worker_key
     packages = scene_packages(payload, solve_cache)
     for package in packages.values():
@@ -640,11 +657,17 @@ def main() -> int:
                         _emit("completed", request_id=request_id, cancelled=bool(matches))
                         continue
                     if operation == "detect_backend":
-                        _emit("result", request_id=request_id, result={"backend": detect_solver_backend()})
+                        payload = message.get("payload")
+                        requested_backend = payload.get("backend") if isinstance(payload, dict) else None
+                        _emit("result", request_id=request_id, result={"backend": detect_solver_backend(requested_backend)})
                         _emit("completed", request_id=request_id)
                         continue
                     if operation == "warmup":
                         backend = str(message.get("backend", "cuda")).strip().lower()
+                        if backend not in {"cuda", "cpu", "metal"}:
+                            raise ValueError("Deploy worker backend must be cuda, cpu, or metal.")
+                        if backend == "metal" and sys.platform != "darwin":
+                            raise ValueError("BEAT Metal solving is available only on macOS.")
                         worker_key = backend
                         worker = workers.get(worker_key)
                         if worker is None:

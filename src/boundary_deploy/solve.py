@@ -830,6 +830,10 @@ def prepare_deploy_solve_request(
     if len(set(rigid_ids)) != len(rigid_ids) or set(rigid_ids).intersection(source_ids):
         raise ValueError("Deploy boundary object ids must be unique.")
     backend = str(payload.get("backend", "cuda")).strip().lower()
+    if backend not in {"cuda", "cpu", "metal"}:
+        raise ValueError("Deploy backend must be cuda, cpu, or metal.")
+    if backend == "metal" and str(payload.get("fidelity", "boundary")).strip().lower() == "coupled":
+        raise ValueError("Deploy Level 3 parity ROM currently requires the CUDA backend.")
     raw_observation_points = payload.get("observationPointsM")
     observation = None
     if raw_observation_points is None:
@@ -1282,7 +1286,7 @@ def prepare_deploy_solve_request(
         request["observation_points_m"] = points_m.tolist()
         request["observation_shape"] = observation_shape
         request["observation_sample_indices"] = observation_sample_indices.tolist()
-    if observation is not None:
+    if observation is not None and backend == "cuda":
         request["observation_plane"] = observation.wire()
     if status_callback is not None:
         status_callback("Serializing BEAT request")
@@ -1905,6 +1909,8 @@ def prepare_deploy_field_request(payload: object, work_dir: str | Path) -> tuple
     if points_m.shape[0] == 0:
         raise ValueError("Deploy observation plane has no sampling points on or above the ground plane.")
     backend = str(payload.get("backend", "cuda")).strip().lower()
+    if backend not in {"cuda", "cpu", "metal"}:
+        raise ValueError("Deploy backend must be cuda, cpu, or metal.")
     request: dict[str, Any] = {
         "schema": DEPLOY_FIELD_SCHEMA,
         "schema_version": 1,
